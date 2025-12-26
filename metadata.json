@@ -1,0 +1,5 @@
+
+{
+  "name": "Auth0 SSO Landing Hub",
+  "description": "A React application featuring an Auth0-powered landing page with seamless SSO (Single Sign-On) integration and protected dashboard routing."
+}
