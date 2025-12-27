@@ -180,3 +180,91 @@ Ensure karein ke Project B me bhi `vercel.json` file hai:
 
 Ye changes apply karne ke baad Project B me bhi silent login ke baad automatic dashboard redirect ho jayega!
 
+---
+
+## SSO Logout Fix (Project B me bhi apply karna hai)
+
+### Problem
+Project B se logout karne par Project A me logout nahi ho raha, ya Project A se logout karne par Project B me logout nahi ho raha.
+
+### Solution: Navbar.tsx me logout function update karo
+
+```tsx
+import React from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
+import { LogIn, LogOut, Layout } from 'lucide-react';
+
+const Navbar: React.FC = () => {
+  const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+
+  // Handle logout with SSO (Single Sign-Out)
+  // This ensures logout from both Project A and Project B
+  const handleLogout = () => {
+    const auth0Domain = "dev-4v4hx3vrjxrwitlc.us.auth0.com";
+    const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
+    const returnTo = window.location.origin;
+    
+    // Clear Auth0 cache from localStorage (same key used by Auth0 React SDK)
+    // This clears the local session immediately
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('auth0') || key.includes('@@auth0spajs@@')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Clear session storage flags
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('ss_check_')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    
+    // Use Auth0's logout endpoint with federated logout
+    // This clears the Auth0 session centrally, which will logout from all apps
+    const logoutUrl = `https://${auth0Domain}/v2/logout?` +
+      `client_id=${clientId}&` +
+      `returnTo=${encodeURIComponent(returnTo)}&` +
+      `federated`; // Enables federated logout (clears Auth0 session)
+    
+    // Redirect to Auth0 logout endpoint
+    // This will clear the Auth0 session and redirect back
+    window.location.href = logoutUrl;
+  };
+
+  return (
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      {/* ... rest of your navbar code ... */}
+      <button
+        onClick={handleLogout}  // Use handleLogout instead of logout()
+        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <LogOut size={16} />
+        <span>Sign Out</span>
+      </button>
+      {/* ... */}
+    </nav>
+  );
+};
+
+export default Navbar;
+```
+
+### How It Works
+
+1. **Clear Local Cache**: Sabhi Auth0-related keys localStorage aur sessionStorage se clear hote hain
+2. **Auth0 Logout Endpoint**: Auth0 ke `/v2/logout` endpoint ko call karta hai
+3. **Federated Parameter**: `federated` parameter Auth0 session ko centrally clear karta hai
+4. **Central Session Clear**: Jab Auth0 session clear hota hai, to sabhi connected apps automatically logout ho jate hain
+5. **Redirect Back**: Logout ke baad user ko same app ke home page par redirect kar deta hai
+
+### Testing
+
+1. Project A me login karo
+2. Project B me bhi login hoga (SSO ke through)
+3. Project A me logout karo
+4. Project B me bhi automatically logout ho jana chahiye (refresh karne par)
+5. Ya Project B me logout karo
+6. Project A me bhi automatically logout ho jana chahiye (refresh karne par)
+
+**Important**: Dono projects me same logout code apply karna hai!
+
