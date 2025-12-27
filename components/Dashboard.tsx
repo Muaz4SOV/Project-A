@@ -1,10 +1,36 @@
 
 import React from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { User, Mail, Shield, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Shield, CheckCircle2, ArrowRight } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth0();
+
+  // Function to redirect to Project B with silent login
+  const redirectToProjectB = () => {
+    const auth0Domain = "dev-4v4hx3vrjxrwitlc.us.auth0.com";
+    const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
+    const projectBUrl = "https://project-b-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app";
+    const redirectUri = `${projectBUrl}/callback`;
+    
+    // Generate a random state for security
+    const state = btoa(JSON.stringify({ 
+      timestamp: Date.now(),
+      random: Math.random().toString(36).substring(7)
+    })).replace(/[+/=]/g, '');
+
+    // Construct Auth0 authorization URL with silent login (prompt: none)
+    const authUrl = `https://${auth0Domain}/authorize?` +
+      `client_id=${clientId}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=code&` +
+      `scope=openid profile email offline_access&` +
+      `prompt=none&` +
+      `state=${state}`;
+
+    // Redirect to Project B with silent login
+    window.location.href = authUrl;
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
@@ -61,9 +87,16 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
                 <p className="text-blue-800 font-semibold mb-1">SSO Active</p>
-                <p className="text-sm text-blue-600/80 leading-snug">
+                <p className="text-sm text-blue-600/80 leading-snug mb-3">
                   You can now visit any linked application in our network and you will be logged in automatically!
                 </p>
+                <button
+                  onClick={redirectToProjectB}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+                >
+                  <span>Go to Project B</span>
+                  <ArrowRight size={16} />
+                </button>
               </div>
             </div>
           </div>
