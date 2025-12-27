@@ -67,7 +67,18 @@ const App: React.FC = () => {
 
             <Route 
               path="/callback" 
-              element={<Navigate to="/dashboard" replace />} 
+              element={
+                isLoading ? (
+                  <div className="h-screen w-full flex flex-col items-center justify-center bg-white text-center p-4">
+                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+                    <p className="text-gray-600 font-bold text-xl tracking-tight">Completing sign in...</p>
+                  </div>
+                ) : isAuthenticated ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } 
             />
 
             <Route 

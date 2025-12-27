@@ -1,0 +1,27 @@
+=== COPY THESE URLs TO AUTH0 ===
+
+ALLOWED CALLBACK URLs (add these one per line):
+https://project-a-flax.vercel.app/callback
+https://project-a-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app/callback
+https://project-bdl7tbrhh-muhammad-muazs-projects-cc9bdaf8.vercel.app/callback
+https://project-i3j3zfwhe-muhammad-muazs-projects-cc9bdaf8.vercel.app/callback
+
+ALLOWED LOGOUT URLs (add these one per line):
+https://project-a-flax.vercel.app
+https://project-a-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app
+https://project-bdl7tbrhh-muhammad-muazs-projects-cc9bdaf8.vercel.app
+https://project-i3j3zfwhe-muhammad-muazs-projects-cc9bdaf8.vercel.app
+
+ALLOWED WEB ORIGINS (add these one per line):
+https://project-a-flax.vercel.app
+https://project-a-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app
+https://project-bdl7tbrhh-muhammad-muazs-projects-cc9bdaf8.vercel.app
+https://project-i3j3zfwhe-muhammad-muazs-projects-cc9bdaf8.vercel.app
+
+=== HOW TO ADD ===
+1. Go to: https://manage.auth0.com
+2. Applications → Your App (Client ID: zYRUiCf30KOiUnBCELNgek3J4lm11pLR)
+3. Settings tab
+4. Paste URLs in respective fields (one per line)
+5. Click SAVE CHANGES
+
