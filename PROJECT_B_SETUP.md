@@ -1,4 +1,15 @@
+# Project B - Silent Login & Auto Redirect Fix
 
+## Problem
+Project B me silent login hone ke baad automatically Dashboard par redirect nahi ho raha.
+
+## Solution
+
+Project B me same code apply karna hai jo Project A me hai. Yani:
+
+### 1. App.tsx File me ye changes:
+
+```tsx
 import React, { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -128,3 +139,44 @@ const App: React.FC = () => {
 };
 
 export default App;
+```
+
+### 2. Important Points:
+
+1. **Callback Route Handling**: Callback route par SSO check skip karna hai
+2. **Wait for Auth0**: Callback route par `isLoading` true hone tak wait karna hai
+3. **Auto Redirect**: Jab `isAuthenticated` true ho jaye, automatically `/dashboard` par redirect
+4. **Session Storage**: Successful callback ke baad `ss_check_performed` flag clear karna hai
+
+### 3. vercel.json File
+
+Ensure karein ke Project B me bhi `vercel.json` file hai:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+### 4. Testing
+
+1. Project A se "Go to Project B" button click karein
+2. Auth0 silent login hoga
+3. Callback route par redirect hoga
+4. Loading screen dikhega
+5. Automatic `/dashboard` par redirect ho jayega
+
+## Key Changes Explained
+
+- **AppContent Component**: Router ke andar useLocation hook use kiya
+- **Callback Route Check**: `/callback` route par SSO check skip kiya
+- **Better Loading State**: Callback route apna loading state handle karta hai
+- **Session Cleanup**: Successful authentication ke baad flags clear kiye
+
+Ye changes apply karne ke baad Project B me bhi silent login ke baad automatic dashboard redirect ho jayega!
+
