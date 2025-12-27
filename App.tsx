@@ -24,46 +24,77 @@ const AppContent: React.FC = () => {
     }
 
     const checkSso = async () => {
-      if (!isLoading && !isAuthenticated) {
-        // Prevent infinite loops by checking if we already tried this session
-        const triedSilent = sessionStorage.getItem('ss_check_performed');
-        
-        if (!triedSilent) {
-          sessionStorage.setItem('ss_check_performed', 'true');
-          try {
-            await loginWithRedirect({
-              authorizationParams: {
-                prompt: 'none', // This checks Auth0 session without showing any UI
-              }
-            });
-          } catch (e) {
-            console.log("Silent SSO check failed or interaction required.", e);
-            setIsCheckingSso(false);
-          }
-        } else {
-          setIsCheckingSso(false);
-        }
-      } else if (!isLoading && isAuthenticated) {
-        // Clear the SSO check flag if authenticated
-        sessionStorage.removeItem('ss_check_performed');
+      // Wait for Auth0 to initialize
+      if (isLoading) {
+        return;
+      }
+
+      // If already authenticated, no need to check
+      if (isAuthenticated) {
+        const originFlag = `ss_check_${window.location.origin}`;
+        sessionStorage.removeItem(originFlag);
         setIsCheckingSso(false);
-      } else if (!isLoading) {
+        return;
+      }
+
+      // Use origin-based flag instead of global flag (allows check per domain)
+      const originFlag = `ss_check_${window.location.origin}`;
+      const triedSilent = sessionStorage.getItem(originFlag);
+      
+      if (!triedSilent) {
+        sessionStorage.setItem(originFlag, 'true');
+        
+        try {
+          // Silent login attempt - this will redirect to callback if session exists
+          await loginWithRedirect({
+            authorizationParams: {
+              prompt: 'none', // Silent login - no UI shown
+            },
+            appState: {
+              returnTo: '/dashboard'
+            }
+          });
+          // If loginWithRedirect succeeds, we'll be redirected to callback
+          // So we don't need to set isCheckingSso to false here
+        } catch (e: any) {
+          // Silent login failed - either no session or user interaction needed
+          console.log("Silent SSO check failed or interaction required.", e);
+          setIsCheckingSso(false);
+          // Clear the flag on error so user can retry by refreshing
+          sessionStorage.removeItem(originFlag);
+        }
+      } else {
         setIsCheckingSso(false);
       }
     };
 
-    checkSso();
+    // Run check immediately if Auth0 is already initialized, otherwise wait
+    if (!isLoading) {
+      checkSso();
+    } else {
+      // Wait for Auth0 to initialize
+      const timer = setTimeout(() => {
+        checkSso();
+      }, 50);
+
+      return () => clearTimeout(timer);
+    }
   }, [isLoading, isAuthenticated, loginWithRedirect, isCallbackRoute]);
 
   // Handle callback route - wait for Auth0 to process and redirect
   useEffect(() => {
     if (isCallbackRoute && !isLoading && isAuthenticated) {
       // Clear SSO check flag after successful callback
-      sessionStorage.removeItem('ss_check_performed');
+      const originFlag = `ss_check_${window.location.origin}`;
+      sessionStorage.removeItem(originFlag);
     }
   }, [isCallbackRoute, isLoading, isAuthenticated]);
 
-  // Show loading only if not on callback route (callback route handles its own loading)
+  // Show loading screen while:
+  // 1. Auth0 is initializing (isLoading)
+  // 2. We're checking for SSO (isCheckingSso)
+  // 3. We're not on callback route (callback has its own loading)
+  // This ensures silent login check completes before showing landing page
   if ((isLoading || isCheckingSso) && !isCallbackRoute) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white text-center p-4">
