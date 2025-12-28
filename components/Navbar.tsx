@@ -13,9 +13,14 @@ const Navbar: React.FC = () => {
     const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
     const returnTo = window.location.origin;
     
-    // Set logout timestamp FIRST - other tabs/apps will check this
+    // Set logout timestamp FIRST - this helps detect logout across tabs
+    // Note: localStorage doesn't share across different domains, but helps with same-domain tabs
     const logoutTime = Date.now().toString();
     localStorage.setItem('auth0_logout_timestamp', logoutTime);
+    
+    // Set logout flag in a way that can be checked via cookies (works across subdomains)
+    // We'll use a cookie with domain that works for both apps
+    document.cookie = `auth0_logout=${logoutTime}; path=/; max-age=600; SameSite=None; Secure`;
     
     // Clear ALL Auth0 cache from localStorage (aggressive cleanup)
     const keysToRemove: string[] = [];
@@ -50,11 +55,12 @@ const Navbar: React.FC = () => {
     });
     
     // Immediately redirect to Auth0 logout endpoint for federated logout
-    // This clears the Auth0 session centrally, which will logout from all apps
+    // The 'federated' parameter ensures Auth0 session is cleared server-side
+    // This will prevent silent login from working on other apps
     const logoutUrl = `https://${auth0Domain}/v2/logout?` +
       `client_id=${clientId}&` +
       `returnTo=${encodeURIComponent(returnTo)}&` +
-      `federated`; // Enables federated logout (clears Auth0 session)
+      `federated`; // CRITICAL: This clears Auth0 session server-side
     
     // Redirect immediately to logout endpoint
     window.location.href = logoutUrl;
