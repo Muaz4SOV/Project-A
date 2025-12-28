@@ -1,10 +1,36 @@
 
 import React from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { LogIn, LogOut, Layout } from 'lucide-react';
+import { LogIn, LogOut, Layout, ArrowRight } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+
+  // Function to redirect to Project B with silent login
+  const redirectToProjectB = () => {
+    const auth0Domain = "dev-4v4hx3vrjxrwitlc.us.auth0.com";
+    const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
+    const projectBUrl = "https://project-b-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app";
+    const redirectUri = `${projectBUrl}/callback`;
+    
+    // Generate a random state for security
+    const state = btoa(JSON.stringify({ 
+      timestamp: Date.now(),
+      random: Math.random().toString(36).substring(7)
+    })).replace(/[+/=]/g, '');
+
+    // Construct Auth0 authorization URL with silent login (prompt: none)
+    const authUrl = `https://${auth0Domain}/authorize?` +
+      `client_id=${clientId}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=code&` +
+      `scope=openid profile email offline_access&` +
+      `prompt=none&` +
+      `state=${state}`;
+
+    // Redirect to Project B with silent login
+    window.location.href = authUrl;
+  };
 
   // Handle logout with SSO (Single Sign-Out)
   // SignalR handles global logout, so no need for timestamp tracking
@@ -70,6 +96,13 @@ const Navbar: React.FC = () => {
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
+                <button
+                  onClick={redirectToProjectB}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  <span>Go to Project B</span>
+                  <ArrowRight size={16} />
+                </button>
                 <div className="hidden sm:flex flex-col items-end">
                   <span className="text-sm font-semibold text-gray-900 leading-none">{user?.name}</span>
                   <span className="text-xs text-gray-500">{user?.email}</span>

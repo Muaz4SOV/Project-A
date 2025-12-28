@@ -40,20 +40,19 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      // If already authenticated, skip SSO check
+      // If already authenticated, skip SSO check and redirect to dashboard
       if (isAuthenticated) {
         const originFlag = `ss_check_${window.location.origin}`;
         sessionStorage.removeItem(originFlag);
         setIsCheckingSso(false);
+        // Redirect to dashboard if on landing page
+        if (location.pathname === '/') {
+          window.location.href = '/dashboard/home';
+        }
         return;
       }
 
-      // REMOVED: Logout timestamp check from silent login
-      // SignalR handles logout events, so we don't need to block silent login
-      // Allow silent login to proceed - if session exists, user will be logged in
-      // If session doesn't exist, silent login will fail gracefully
-
-      // Use origin-based flag instead of global flag (allows check per domain)
+      // Use origin-based flag to prevent multiple attempts
       const originFlag = `ss_check_${window.location.origin}`;
       const triedSilent = sessionStorage.getItem(originFlag);
       
@@ -61,26 +60,34 @@ const AppContent: React.FC = () => {
         sessionStorage.setItem(originFlag, 'true');
         
         try {
+          console.log('🔄 Attempting silent SSO login...');
           // Silent login attempt - this will redirect to callback if session exists
+          // IMPORTANT: This will redirect the page, so we don't set isCheckingSso to false
           await loginWithRedirect({
             authorizationParams: {
               prompt: 'none', // Silent login - no UI shown
             },
             appState: {
-              returnTo: '/dashboard'
+              returnTo: '/dashboard/home'
             }
           });
-          // If loginWithRedirect succeeds, we'll be redirected to callback
-          // So we don't need to set isCheckingSso to false here
+          // If we reach here without redirect, login might be pending
+          // Keep checking state for a bit
+          setTimeout(() => {
+            if (!isAuthenticated) {
+              console.log('⏱️ Silent login pending, showing landing page');
+              setIsCheckingSso(false);
+            }
+          }, 2000);
         } catch (e: any) {
-          // Silent login failed - either no session or user interaction needed
-          // This is normal - user needs to click Sign In button for manual login
-          console.log("Silent SSO check failed or interaction required.", e);
+          // Silent login failed - no active session
+          console.log("❌ Silent SSO check failed - no active session", e);
           setIsCheckingSso(false);
-          // Clear the flag on error so user can retry by refreshing
+          // Clear the flag so user can retry by clicking Sign In
           sessionStorage.removeItem(originFlag);
         }
       } else {
+        // Already tried silent login, show landing page
         setIsCheckingSso(false);
       }
     };
@@ -113,6 +120,11 @@ const AppContent: React.FC = () => {
   // 2. We're checking for SSO (isCheckingSso)
   // 3. We're not on callback route (callback has its own loading)
   // This ensures silent login check completes before showing landing page
+  // IMPORTANT: If authenticated, always redirect to dashboard (never show landing page)
+  if (isAuthenticated && location.pathname === '/') {
+    return <Navigate to="/dashboard/home" replace />;
+  }
+
   if ((isLoading || isCheckingSso) && !isCallbackRoute) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-white text-center p-4">
@@ -131,7 +143,7 @@ const AppContent: React.FC = () => {
           <Route 
             path="/" 
             element={
-              isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
+              isAuthenticated ? <Navigate to="/dashboard/home" replace /> : <LandingPage />
             } 
           />
 
@@ -145,7 +157,7 @@ const AppContent: React.FC = () => {
                   <p className="text-gray-400 text-sm mt-2">Please wait while we authenticate you.</p>
                 </div>
               ) : isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate to="/dashboard/home" replace />
               ) : (
                 <Navigate to="/" replace />
               )
@@ -154,6 +166,34 @@ const AppContent: React.FC = () => {
 
           <Route 
             path="/dashboard" 
+            element={
+              isAuthenticated ? <Navigate to="/dashboard/home" replace /> : <Navigate to="/" replace />
+            } 
+          />
+
+          <Route 
+            path="/dashboard/home" 
+            element={
+              isAuthenticated ? <Dashboard /> : <Navigate to="/" replace />
+            } 
+          />
+
+          <Route 
+            path="/dashboard/users" 
+            element={
+              isAuthenticated ? <Dashboard /> : <Navigate to="/" replace />
+            } 
+          />
+
+          <Route 
+            path="/dashboard/role" 
+            element={
+              isAuthenticated ? <Dashboard /> : <Navigate to="/" replace />
+            } 
+          />
+
+          <Route 
+            path="/dashboard/settings" 
             element={
               isAuthenticated ? <Dashboard /> : <Navigate to="/" replace />
             } 

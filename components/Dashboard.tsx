@@ -1,112 +1,95 @@
-
-import React from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
-import { User, Mail, Shield, CheckCircle2, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Home, Users, Shield, Settings, Menu, X } from 'lucide-react';
+import HomePage from './pages/Home';
+import UsersPage from './pages/Users';
+import RolePage from './pages/Role';
+import SettingsPage from './pages/Settings';
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth0();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Function to redirect to Project B with silent login
-  const redirectToProjectB = () => {
-    const auth0Domain = "dev-4v4hx3vrjxrwitlc.us.auth0.com";
-    const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
-    const projectBUrl = "https://project-b-git-main-muhammad-muazs-projects-cc9bdaf8.vercel.app";
-    const redirectUri = `${projectBUrl}/callback`;
-    
-    // Generate a random state for security
-    const state = btoa(JSON.stringify({ 
-      timestamp: Date.now(),
-      random: Math.random().toString(36).substring(7)
-    })).replace(/[+/=]/g, '');
+  // Get current page from URL
+  const currentPage = location.pathname.split('/').pop() || 'home';
 
-    // Construct Auth0 authorization URL with silent login (prompt: none)
-    const authUrl = `https://${auth0Domain}/authorize?` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=code&` +
-      `scope=openid profile email offline_access&` +
-      `prompt=none&` +
-      `state=${state}`;
+  const menuItems = [
+    { id: 'home', label: 'Home', icon: Home, path: '/dashboard/home' },
+    { id: 'users', label: 'Users', icon: Users, path: '/dashboard/users' },
+    { id: 'role', label: 'Role', icon: Shield, path: '/dashboard/role' },
+    { id: 'settings', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
+  ];
 
-    // Redirect to Project B with silent login
-    window.location.href = authUrl;
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case 'home':
+        return <HomePage />;
+      case 'users':
+        return <UsersPage />;
+      case 'role':
+        return <RolePage />;
+      case 'settings':
+        return <SettingsPage />;
+      default:
+        return <HomePage />;
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-      <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 h-32 relative">
-          <div className="absolute -bottom-12 left-8 border-4 border-white rounded-2xl overflow-hidden shadow-lg bg-white">
-            <img 
-              src={user?.picture || 'https://picsum.photos/100/100'} 
-              alt={user?.name} 
-              className="w-24 h-24 object-cover"
-            />
-          </div>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside
+        className={`${
+          sidebarOpen ? 'w-64' : 'w-20'
+        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}
+      >
+        <div className="p-4 flex items-center justify-between border-b border-gray-200">
+          {sidebarOpen && (
+            <h2 className="text-xl font-bold text-gray-900">AppNexus</h2>
+          )}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
 
-        <div className="pt-16 pb-8 px-8">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900">{user?.name}</h2>
-              <p className="text-gray-500 font-medium">{user?.nickname || 'Professional User'}</p>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-sm font-bold border border-green-100">
-              <CheckCircle2 size={16} />
-              Authenticated Session
-            </div>
-          </div>
+        <nav className="flex-1 p-4">
+          <ul className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPage === item.id;
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">User Details</h3>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <Mail className="text-gray-400" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold">Email Address</p>
-                  <p className="text-gray-900 font-medium">{user?.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <User className="text-gray-400" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold">Username</p>
-                  <p className="text-gray-900 font-medium">{user?.preferred_username || user?.nickname || 'Not set'}</p>
-                </div>
-              </div>
-            </div>
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => handleNavigation(item.path)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon size={20} />
+                    {sidebarOpen && <span>{item.label}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
 
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Security Stats</h3>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <Shield className="text-blue-500" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold">Verification Status</p>
-                  <p className="text-gray-900 font-medium">{user?.email_verified ? 'Verified Email' : 'Pending Verification'}</p>
-                </div>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                <p className="text-blue-800 font-semibold mb-1">SSO Active</p>
-                <p className="text-sm text-blue-600/80 leading-snug mb-3">
-                  You can now visit any linked application in our network and you will be logged in automatically!
-                </p>
-                <button
-                  onClick={redirectToProjectB}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 shadow-sm transition-all active:scale-95"
-                >
-                  <span>Go to Project B</span>
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 px-8 py-4 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-xs text-gray-400 italic">Auth0 Session ID: {user?.sub?.split('|')[1].substring(0, 10)}...</span>
-          <button className="text-sm text-blue-600 font-bold hover:underline">Download Security Audit</button>
-        </div>
-      </div>
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        {renderContent()}
+      </main>
     </div>
   );
 };
