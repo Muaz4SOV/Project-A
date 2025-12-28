@@ -95,11 +95,18 @@ const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => {
-                  // Clear logout timestamp when user manually clicks Sign In
-                  // This allows user to login even if they recently logged out
+                  // Clear ALL flags and timestamps when user manually clicks Sign In
+                  // This ensures clean login without any blocking
                   localStorage.removeItem('auth0_logout_timestamp');
-                  document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
                   localStorage.removeItem('auth0_last_session_check');
+                  document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                  
+                  // Clear session storage flags that might block login
+                  Object.keys(sessionStorage).forEach(key => {
+                    if (key.startsWith('ss_check_')) {
+                      sessionStorage.removeItem(key);
+                    }
+                  });
                   
                   // Proceed with manual login
                   loginWithRedirect();

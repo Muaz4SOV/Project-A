@@ -231,48 +231,10 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      // Check if logout happened recently - if yes, skip silent login
-      // Check both localStorage and cookies
-      const logoutTimestamp = localStorage.getItem('auth0_logout_timestamp');
-      const logoutCookie = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('auth0_logout='));
-      
-      const cookieLogoutTime = logoutCookie ? parseInt(logoutCookie.split('=')[1]) : null;
-      const storageLogoutTime = logoutTimestamp ? parseInt(logoutTimestamp) : null;
-      
-      // Get the most recent logout time
-      let logoutTime: number | null = null;
-      if (storageLogoutTime) logoutTime = storageLogoutTime;
-      if (cookieLogoutTime && (!logoutTime || cookieLogoutTime > logoutTime)) {
-        logoutTime = cookieLogoutTime;
-      }
-      
-      if (logoutTime) {
-        const now = Date.now();
-        const timeDiff = now - logoutTime;
-        
-        // If logout timestamp is older than 10 minutes, clear it (user can login again)
-        if (timeDiff > 10 * 60 * 1000) {
-          localStorage.removeItem('auth0_logout_timestamp');
-          document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        } 
-        // If logout happened in last 2 minutes, skip silent login (reduced from 10 minutes)
-        // After 2 minutes, allow silent login again (user might have logged in from another device)
-        else if (timeDiff < 2 * 60 * 1000) {
-          console.log("Recent logout detected - skipping silent login to prevent re-authentication", {
-            logoutTime,
-            timeDiff: Math.round(timeDiff / 1000) + ' seconds ago'
-          });
-          setIsCheckingSso(false);
-          return;
-        } else {
-          // Logout timestamp is old (2-10 minutes) - clear it and allow silent login
-          console.log("Clearing old logout timestamp - allowing silent login");
-          localStorage.removeItem('auth0_logout_timestamp');
-          document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        }
-      }
+      // REMOVED: Logout timestamp check from silent login
+      // SignalR handles logout events, so we don't need to block silent login
+      // Allow silent login to proceed - if session exists, user will be logged in
+      // If session doesn't exist, silent login will fail gracefully
 
       // Use origin-based flag instead of global flag (allows check per domain)
       const originFlag = `ss_check_${window.location.origin}`;
@@ -295,6 +257,7 @@ const AppContent: React.FC = () => {
           // So we don't need to set isCheckingSso to false here
         } catch (e: any) {
           // Silent login failed - either no session or user interaction needed
+          // This is normal - user needs to click Sign In button for manual login
           console.log("Silent SSO check failed or interaction required.", e);
           setIsCheckingSso(false);
           // Clear the flag on error so user can retry by refreshing
