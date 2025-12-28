@@ -55,10 +55,33 @@ export const useLogoutSignalR = () => {
       return;
     }
 
-    // If connection already exists and is connected, don't create a new one
+    // Log current route for debugging
+    console.log('🔍 SignalR Hook - User authenticated:', {
+      userId: user.sub,
+      currentPath: window.location.pathname,
+      isAuthenticated
+    });
+
+    // IMPORTANT: Check if connection already exists and is connected
+    // If connected, verify it's still in the correct group (user might have changed)
     if (connectionRef.current && connectionRef.current.state === HubConnectionState.Connected) {
-      console.log('✅ SignalR already connected');
+      console.log('✅ SignalR already connected - verifying group membership');
+      console.log('📍 Current route:', window.location.pathname);
+      
+      // Ensure user is still in the group (in case of user change or re-authentication)
+      // This is especially important on callback route where user just logged in
+      if (user.sub) {
+        console.log('🔄 Verifying/rejoining logout group for user:', user.sub);
+        joinLogoutGroup(connectionRef.current, user.sub);
+      }
       return;
+    }
+
+    // If connection exists but is not connected, clean it up and create new one
+    if (connectionRef.current && connectionRef.current.state !== HubConnectionState.Connected) {
+      console.log('🔄 Cleaning up disconnected connection, creating new one');
+      connectionRef.current.stop().catch(() => {});
+      connectionRef.current = null;
     }
 
     // Create SignalR connection
@@ -77,36 +100,8 @@ export const useLogoutSignalR = () => {
 
     connectionRef.current = connection;
 
-    // Start connection
-    connection.start()
-      .then(() => {
-        console.log('✅ SignalR Connected to Logout Hub');
-        console.log('🔗 Connection State:', connection.state);
-        console.log('👤 User ID:', user.sub);
-
-        // Join user-specific group with retry logic
-        if (user.sub) {
-          joinLogoutGroup(connection, user.sub);
-        }
-      })
-      .catch(err => {
-        console.error('❌ SignalR Connection Error:', err);
-        // Retry connection after delay
-        setTimeout(() => {
-          if (connectionRef.current && connectionRef.current.state !== HubConnectionState.Connected) {
-            connectionRef.current.start()
-              .then(() => {
-                console.log('✅ SignalR Reconnected after error');
-                if (user?.sub) {
-                  joinLogoutGroup(connectionRef.current!, user.sub);
-                }
-              })
-              .catch(err => console.error('❌ Retry connection failed:', err));
-          }
-        }, 3000);
-      });
-
-    // Listen for logout event - set up BEFORE starting connection
+    // IMPORTANT: Set up event handler BEFORE starting connection
+    // This ensures we catch logout events even if they arrive immediately after connection
     connection.on('UserLoggedOut', async (data: { 
       UserId: string; 
       SessionId?: string; 
@@ -116,6 +111,7 @@ export const useLogoutSignalR = () => {
       console.log('🔔 Logout event received:', data);
       console.log('👤 Current user:', user?.sub);
       console.log('🔍 Event UserId:', data.UserId);
+      console.log('📍 Current URL:', window.location.href);
 
       // Check if this logout is for current user (exact match)
       if (data.UserId === user?.sub) {
@@ -151,13 +147,41 @@ export const useLogoutSignalR = () => {
         logout({
           logoutParams: {
             returnTo: window.location.origin
-          },
-          localOnly: false
+          }
         });
       } else {
         console.log('ℹ️ Logout event for different user - ignoring');
       }
     });
+
+    // Start connection
+    connection.start()
+      .then(() => {
+        console.log('✅ SignalR Connected to Logout Hub');
+        console.log('🔗 Connection State:', connection.state);
+        console.log('👤 User ID:', user.sub);
+
+        // Join user-specific group with retry logic
+        if (user.sub) {
+          joinLogoutGroup(connection, user.sub);
+        }
+      })
+      .catch(err => {
+        console.error('❌ SignalR Connection Error:', err);
+        // Retry connection after delay
+        setTimeout(() => {
+          if (connectionRef.current && connectionRef.current.state !== HubConnectionState.Connected) {
+            connectionRef.current.start()
+              .then(() => {
+                console.log('✅ SignalR Reconnected after error');
+                if (user?.sub) {
+                  joinLogoutGroup(connectionRef.current!, user.sub);
+                }
+              })
+              .catch(err => console.error('❌ Retry connection failed:', err));
+          }
+        }, 3000);
+      });
 
     // Handle connection events
     connection.onreconnecting((error) => {
