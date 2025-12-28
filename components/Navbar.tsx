@@ -94,7 +94,16 @@ const Navbar: React.FC = () => {
               </div>
             ) : (
               <button
-                onClick={() => loginWithRedirect()}
+                onClick={() => {
+                  // Clear logout timestamp when user manually clicks Sign In
+                  // This allows user to login even if they recently logged out
+                  localStorage.removeItem('auth0_logout_timestamp');
+                  document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                  localStorage.removeItem('auth0_last_session_check');
+                  
+                  // Proceed with manual login
+                  loginWithRedirect();
+                }}
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700 shadow-sm transition-all active:scale-95"
               >
                 <LogIn size={16} />

@@ -257,14 +257,20 @@ const AppContent: React.FC = () => {
           localStorage.removeItem('auth0_logout_timestamp');
           document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         } 
-        // If logout happened in last 10 minutes, skip silent login
-        else if (timeDiff < 10 * 60 * 1000) {
-          console.log("Logout detected - skipping silent login to prevent re-authentication", {
+        // If logout happened in last 2 minutes, skip silent login (reduced from 10 minutes)
+        // After 2 minutes, allow silent login again (user might have logged in from another device)
+        else if (timeDiff < 2 * 60 * 1000) {
+          console.log("Recent logout detected - skipping silent login to prevent re-authentication", {
             logoutTime,
             timeDiff: Math.round(timeDiff / 1000) + ' seconds ago'
           });
           setIsCheckingSso(false);
           return;
+        } else {
+          // Logout timestamp is old (2-10 minutes) - clear it and allow silent login
+          console.log("Clearing old logout timestamp - allowing silent login");
+          localStorage.removeItem('auth0_logout_timestamp');
+          document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         }
       }
 
