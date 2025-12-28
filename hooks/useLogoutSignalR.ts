@@ -8,6 +8,13 @@ export const useLogoutSignalR = () => {
   const { user, isAuthenticated, logout } = useAuth0();
   const connectionRef = useRef<HubConnection | null>(null);
   const joinGroupRetryRef = useRef<NodeJS.Timeout | null>(null);
+  const userRef = useRef<string | undefined>(user?.sub);
+  
+  // Update user ref whenever user changes
+  useEffect(() => {
+    userRef.current = user?.sub;
+    console.log('👤 User ref updated:', userRef.current);
+  }, [user?.sub]);
 
   // Helper function to join logout group with retry logic
   const joinLogoutGroup = async (connection: HubConnection, userId: string, retryCount = 0) => {
@@ -67,12 +74,58 @@ export const useLogoutSignalR = () => {
     if (connectionRef.current && connectionRef.current.state === HubConnectionState.Connected) {
       console.log('✅ SignalR already connected - verifying group membership');
       console.log('📍 Current route:', window.location.pathname);
+      console.log('👤 Current user:', user.sub);
+      console.log('👤 User ref:', userRef.current);
       
       // Ensure user is still in the group (in case of user change or re-authentication)
       // This is especially important on callback route where user just logged in
       if (user.sub) {
         console.log('🔄 Verifying/rejoining logout group for user:', user.sub);
         joinLogoutGroup(connectionRef.current, user.sub);
+        
+        // Also remove old event handler and set up new one to ensure latest user ref is used
+        connectionRef.current.off('UserLoggedOut');
+        
+        // Re-setup event handler with latest user ref
+        connectionRef.current.on('UserLoggedOut', async (data: any) => {
+          const currentUserId = userRef.current;
+          // Backend sends lowercase 'userId', handle both cases
+          const eventUserId = data.UserId || data.userId || data.user_id;
+          
+          console.log('🔔 Logout event received (reconnected handler):', data);
+          console.log('👤 Current user (ref):', currentUserId);
+          console.log('🔍 Event UserId (extracted):', eventUserId);
+          
+          if (eventUserId && currentUserId && eventUserId === currentUserId) {
+            console.log('🚪 Current user logged out - performing logout');
+            
+            // Clear cache
+            Object.keys(localStorage).forEach(key => {
+              if (key.includes('auth0') || key.includes('@@auth0spajs@@') || key.toLowerCase().includes('auth')) {
+                localStorage.removeItem(key);
+              }
+            });
+            Object.keys(sessionStorage).forEach(key => {
+              if (key.startsWith('ss_check_')) {
+                sessionStorage.removeItem(key);
+              }
+            });
+            
+            try {
+              if (connectionRef.current?.state === HubConnectionState.Connected) {
+                await connectionRef.current.stop();
+              }
+            } catch (err) {
+              console.error('Error stopping connection:', err);
+            }
+            
+            logout({
+              logoutParams: { returnTo: window.location.origin }
+            });
+          } else {
+            console.log('ℹ️ Logout event for different user - ignoring');
+          }
+        });
       }
       return;
     }
@@ -102,19 +155,25 @@ export const useLogoutSignalR = () => {
 
     // IMPORTANT: Set up event handler BEFORE starting connection
     // This ensures we catch logout events even if they arrive immediately after connection
-    connection.on('UserLoggedOut', async (data: { 
-      UserId: string; 
-      SessionId?: string; 
-      LogoutTime: string;
-      Message?: string;
-    }) => {
+    connection.on('UserLoggedOut', async (data: any) => {
+      // Use ref to get latest user value (not closure)
+      const currentUserId = userRef.current;
+      
+      // Backend sends lowercase 'userId', handle both cases
+      const eventUserId = data.UserId || data.userId || data.user_id;
+      
       console.log('🔔 Logout event received:', data);
-      console.log('👤 Current user:', user?.sub);
-      console.log('🔍 Event UserId:', data.UserId);
+      console.log('👤 Current user (from ref):', currentUserId);
+      console.log('👤 Current user (from hook):', user?.sub);
+      console.log('🔍 Event UserId (raw):', data.UserId);
+      console.log('🔍 Event userId (raw):', data.userId);
+      console.log('🔍 Event userId (extracted):', eventUserId);
       console.log('📍 Current URL:', window.location.href);
+      console.log('📍 Current Path:', window.location.pathname);
 
       // Check if this logout is for current user (exact match)
-      if (data.UserId === user?.sub) {
+      // Use ref value to avoid stale closure issues
+      if (eventUserId && currentUserId && eventUserId === currentUserId) {
         console.log('🚪 Current user logged out - performing logout');
 
         // Clear all Auth0 cache
