@@ -81,6 +81,7 @@ const AppContent: React.FC = () => {
     };
 
     // Validate session function - checks if Auth0 session is still valid
+    // Uses getUser() to verify session directly with Auth0
     const validateSession = async () => {
       // First check if logout happened in another tab/app
       if (checkLogoutTimestamp()) {
@@ -92,44 +93,62 @@ const AppContent: React.FC = () => {
       localStorage.setItem('auth0_last_session_check', checkTime.toString());
 
       try {
-        // Try to get access token silently with NO cache
-        // This forces Auth0 to check the server-side session
-        // If federated logout cleared the session, this will fail
-        await getAccessTokenSilently({
+        // Method 1: Get fresh access token (forces Auth0 to verify session)
+        const token = await getAccessTokenSilently({
           cacheMode: 'off', // Force fresh token check - bypasses ALL cache
           timeoutInSeconds: 2, // Shorter timeout for faster detection
           authorizationParams: {
             prompt: 'none' // Silent check - no UI
           }
         });
-        
-        // If we got here, token is valid - check logout timestamp again after a moment
-        // to ensure logout didn't happen during the token check
-        setTimeout(() => {
-          if (checkLogoutTimestamp()) {
+
+        // Method 2: Verify token by calling Auth0 userinfo endpoint
+        // This ensures Auth0 session is actually valid
+        // If federated logout cleared the session, this will fail
+        try {
+          const userInfoResponse = await fetch(`https://dev-4v4hx3vrjxrwitlc.us.auth0.com/userinfo`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store' // No cache
+          });
+
+          if (!userInfoResponse.ok) {
+            // Userinfo call failed - session is invalid
+            console.log("Userinfo call failed - Auth0 session invalid", userInfoResponse.status);
+            performLogout();
             return;
           }
-        }, 500);
+
+          // Session is valid - userinfo returned successfully
+        } catch (userInfoError: any) {
+          // Userinfo call failed - session is invalid
+          console.log("Userinfo call failed - Auth0 session invalid", userInfoError);
+          performLogout();
+          return;
+        }
         
       } catch (error: any) {
         // Token refresh failed - session is invalid
-        // This happens when:
-        // 1. User logged out from another app (federated logout cleared Auth0 session)
-        // 2. Auth0 session expired
-        // 3. Network error (but we'll still logout to be safe)
         console.log("Session validation failed - Auth0 session invalid", error);
         
-        // Double-check logout timestamp before logging out
-        if (!checkLogoutTimestamp()) {
-          // If no logout timestamp, it might be a network error
-          // But if error is specifically login_required, it means session is cleared
-          if (error?.error === 'login_required' || 
-              error?.error === 'invalid_grant' ||
-              error?.message?.includes('login_required') ||
-              error?.message?.includes('invalid_grant')) {
-            console.log("Session cleared by logout - performing logout");
-            performLogout();
-          }
+        // Check for specific errors that indicate session is cleared
+        if (error?.error === 'login_required' || 
+            error?.error === 'invalid_grant' ||
+            error?.error === 'unauthorized' ||
+            error?.message?.includes('login_required') ||
+            error?.message?.includes('invalid_grant') ||
+            error?.message?.includes('unauthorized')) {
+          console.log("Session cleared by logout - performing logout");
+          performLogout();
+          return;
+        }
+        
+        // For other errors, check logout timestamp one more time
+        if (checkLogoutTimestamp()) {
+          return;
         }
       }
     };
@@ -162,15 +181,18 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // Initial check after 1 second
-    const initialTimer = setTimeout(validateSession, 1000);
+    // Initial check immediately and then every 2 seconds
+    // Immediate check ensures fast detection when tab becomes active
+    validateSession();
+    const initialTimer = setTimeout(validateSession, 500);
     
-    // Periodic check every 3 seconds (for faster logout detection)
+    // Periodic check every 2 seconds (AGGRESSIVE - for faster logout detection)
+    // This ensures logout is detected within 2-4 seconds
     const interval = setInterval(() => {
       if (!checkLogoutTimestamp()) {
         validateSession();
       }
-    }, 3000);
+    }, 2000);
 
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
