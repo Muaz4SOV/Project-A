@@ -7,22 +7,13 @@ const Navbar: React.FC = () => {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
 
   // Handle logout with SSO (Single Sign-Out)
-  // This ensures logout from both Project A and Project B
+  // SignalR handles global logout, so no need for timestamp tracking
   const handleLogout = () => {
     const auth0Domain = "dev-4v4hx3vrjxrwitlc.us.auth0.com";
     const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
     const returnTo = window.location.origin;
     
-    // Set logout timestamp FIRST - this helps detect logout across tabs
-    // Note: localStorage doesn't share across different domains, but helps with same-domain tabs
-    const logoutTime = Date.now().toString();
-    localStorage.setItem('auth0_logout_timestamp', logoutTime);
-    
-    // Set logout flag in a way that can be checked via cookies (works across subdomains)
-    // We'll use a cookie with domain that works for both apps
-    document.cookie = `auth0_logout=${logoutTime}; path=/; max-age=600; SameSite=None; Secure`;
-    
-    // Clear ALL Auth0 cache from localStorage (aggressive cleanup)
+    // Clear ALL Auth0 cache from localStorage
     const keysToRemove: string[] = [];
     Object.keys(localStorage).forEach(key => {
       if (key.includes('auth0') || 
@@ -54,15 +45,14 @@ const Navbar: React.FC = () => {
       localOnly: true // Clear local cache immediately
     });
     
-    // Immediately redirect to Auth0 logout endpoint for federated logout
-    // The 'federated' parameter ensures Auth0 session is cleared server-side
-    // This will prevent silent login from working on other apps
+    // Redirect to Auth0 logout endpoint for federated logout
+    // Back-Channel Logout will notify backend → SignalR → All apps
     const logoutUrl = `https://${auth0Domain}/v2/logout?` +
       `client_id=${clientId}&` +
       `returnTo=${encodeURIComponent(returnTo)}&` +
-      `federated`; // CRITICAL: This clears Auth0 session server-side
+      `federated`; // This triggers Back-Channel Logout → Backend → SignalR
     
-    // Redirect immediately to logout endpoint
+    // Redirect to logout endpoint
     window.location.href = logoutUrl;
   };
 
@@ -95,12 +85,6 @@ const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => {
-                  // Clear ALL flags and timestamps when user manually clicks Sign In
-                  // This ensures clean login without any blocking
-                  localStorage.removeItem('auth0_logout_timestamp');
-                  localStorage.removeItem('auth0_last_session_check');
-                  document.cookie = 'auth0_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                  
                   // Clear session storage flags that might block login
                   Object.keys(sessionStorage).forEach(key => {
                     if (key.startsWith('ss_check_')) {

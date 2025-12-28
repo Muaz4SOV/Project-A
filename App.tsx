@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { useLogoutSignalR } from './hooks/useLogoutSignalR';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isLoading, loginWithRedirect, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const [isCheckingSso, setIsCheckingSso] = useState(true);
   const location = useLocation();
   const isCallbackRoute = location.pathname === '/callback';
@@ -17,181 +17,9 @@ const AppContent: React.FC = () => {
   // Initialize SignalR logout listener for global logout
   useLogoutSignalR();
 
-  // Session validation - checks if Auth0 session is still valid
-  // This ensures logout from one app is detected by other app
-  useEffect(() => {
-    if (!isAuthenticated || isCallbackRoute) {
-      return;
-    }
-
-    // Check for logout timestamp from another tab/window/app
-    const checkLogoutTimestamp = () => {
-      // Check localStorage (works for same domain tabs)
-      const logoutTimestamp = localStorage.getItem('auth0_logout_timestamp');
-      
-      // Check cookie (works across different domains if set properly)
-      const logoutCookie = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('auth0_logout='));
-      
-      const cookieLogoutTime = logoutCookie ? parseInt(logoutCookie.split('=')[1]) : null;
-      
-      // Get the most recent logout time from either source
-      let logoutTime: number | null = null;
-      if (logoutTimestamp) {
-        logoutTime = parseInt(logoutTimestamp);
-      }
-      if (cookieLogoutTime && (!logoutTime || cookieLogoutTime > logoutTime)) {
-        logoutTime = cookieLogoutTime;
-      }
-      
-      if (logoutTime) {
-        const lastCheck = localStorage.getItem('auth0_last_session_check');
-        
-        // If logout happened after our last check, we need to logout
-        if (!lastCheck || parseInt(lastCheck) < logoutTime) {
-          console.log("Logout detected from another app - logging out", {
-            logoutTime,
-            lastCheck: lastCheck ? parseInt(lastCheck) : null
-          });
-          performLogout();
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Perform logout cleanup
-    const performLogout = () => {
-      // Clear all Auth0 cache from localStorage
-      Object.keys(localStorage).forEach(key => {
-        if (key.includes('auth0') || 
-            key.includes('@@auth0spajs@@') || 
-            key.toLowerCase().includes('auth')) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      // Clear session storage flags
-      Object.keys(sessionStorage).forEach(key => {
-        if (key.startsWith('ss_check_') || 
-            key.toLowerCase().includes('auth')) {
-          sessionStorage.removeItem(key);
-        }
-      });
-      
-      // Reload page to trigger logout state
-      window.location.reload();
-    };
-
-    // Validate session function - checks if Auth0 session is still valid
-    // Uses getUser() to verify session directly with Auth0
-    const validateSession = async () => {
-      // First check if logout happened in another tab/app
-      if (checkLogoutTimestamp()) {
-        return;
-      }
-
-      // Update last check timestamp
-      const checkTime = Date.now();
-      localStorage.setItem('auth0_last_session_check', checkTime.toString());
-
-      // DISABLED: Aggressive session validation
-      // SignalR handles logout events, so this validation causes false positives
-      // Only check logout timestamp (lightweight check)
-      // Full session validation disabled to prevent reload loops
-      
-      // Only check logout timestamp - no API calls
-      checkLogoutTimestamp();
-      
-      /* DISABLED: Full session validation - causes reload issues
-      try {
-        const token = await getAccessTokenSilently({
-          cacheMode: 'off',
-          timeoutInSeconds: 5,
-          authorizationParams: {
-            prompt: 'none'
-          }
-        });
-
-        // Only proceed with validation if token obtained successfully
-        // Skip userinfo check to avoid CORS/network issues causing false positives
-        console.log("Session validation: Token obtained successfully");
-        
-      } catch (error: any) {
-        // Only logout on specific errors, not all errors
-        if (error?.error === 'login_required' || 
-            error?.error === 'invalid_grant' ||
-            error?.error === 'consent_required') {
-          console.log("Session cleared - performing logout", error);
-          performLogout();
-          return;
-        }
-        
-        // For network/timeout errors, don't logout - just log
-        console.log("Session validation error (non-critical):", error?.error || error?.message);
-      }
-      */
-    };
-
-    // Check when page becomes visible (user switches back to this tab)
-    const handleVisibilityChange = () => {
-      if (!document.hidden && isAuthenticated) {
-        validateSession();
-      }
-    };
-
-    // Check when window gets focus
-    const handleFocus = () => {
-      if (isAuthenticated) {
-        validateSession();
-      }
-    };
-
-    // Listen for storage changes (cross-tab communication)
-    // When logout happens in another tab, localStorage changes and triggers this
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth0_logout_timestamp' && e.newValue) {
-        console.log("Logout detected via storage event from another tab");
-        performLogout();
-      }
-    };
-
-    // Immediate check for logout timestamp
-    if (checkLogoutTimestamp()) {
-      return;
-    }
-
-    // DISABLED: Immediate session validation
-    // SignalR handles logout events, so immediate validation not needed
-    // Only check on visibility/focus changes
-    // validateSession(); // Disabled
-    // const initialTimer = setTimeout(validateSession, 500); // Disabled
-    
-    // DISABLED: Periodic session validation
-    // SignalR handles logout events in real-time, so aggressive polling not needed
-    // Uncomment below if you want fallback validation (not recommended with SignalR)
-    /*
-    const interval = setInterval(() => {
-      if (!checkLogoutTimestamp()) {
-        validateSession();
-      }
-    }, 30000); // 30 seconds - much less aggressive
-    */
-
-    // Add event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      // clearTimeout(initialTimer); // Disabled
-      // clearInterval(interval); // Disabled
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [isAuthenticated, isCallbackRoute, getAccessTokenSilently]);
+  // REMOVED: Session validation useEffect
+  // SignalR handles all logout events in real-time
+  // No need for timestamp checking or storage events
 
   // AUTOMATIC SSO DETECTION:
   // If not authenticated, we try a silent login in the background.
@@ -203,15 +31,8 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // Listen for logout events from other tabs/apps
-    const handleLogoutStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth0_logout_timestamp' && e.newValue) {
-        console.log("Logout detected in SSO check via storage event - skipping silent login");
-        setIsCheckingSso(false);
-      }
-    };
-    
-    window.addEventListener('storage', handleLogoutStorageChange);
+    // REMOVED: Storage event listener for logout timestamp
+    // SignalR handles all logout events, so no need for timestamp tracking
 
     const checkSso = async () => {
       // Wait for Auth0 to initialize
@@ -219,15 +40,11 @@ const AppContent: React.FC = () => {
         return;
       }
 
-      // If already authenticated, we still need to validate session
-      // But skip initial SSO check (periodic validation will handle it)
+      // If already authenticated, skip SSO check
       if (isAuthenticated) {
         const originFlag = `ss_check_${window.location.origin}`;
         sessionStorage.removeItem(originFlag);
         setIsCheckingSso(false);
-        
-        // Clear logout timestamp if user is authenticated (they logged back in)
-        localStorage.removeItem('auth0_logout_timestamp');
         return;
       }
 
@@ -280,10 +97,6 @@ const AppContent: React.FC = () => {
       return () => clearTimeout(timer);
     }
 
-    // Cleanup storage listener
-    return () => {
-      window.removeEventListener('storage', handleLogoutStorageChange);
-    };
   }, [isLoading, isAuthenticated, loginWithRedirect, isCallbackRoute]);
 
   // Handle callback route - wait for Auth0 to process and redirect
@@ -292,10 +105,6 @@ const AppContent: React.FC = () => {
       // Clear SSO check flag after successful callback
       const originFlag = `ss_check_${window.location.origin}`;
       sessionStorage.removeItem(originFlag);
-      
-      // Clear logout timestamp after successful login (so user can login again)
-      localStorage.removeItem('auth0_logout_timestamp');
-      localStorage.removeItem('auth0_last_session_check');
     }
   }, [isCallbackRoute, isLoading, isAuthenticated]);
 
