@@ -96,65 +96,42 @@ const AppContent: React.FC = () => {
       const checkTime = Date.now();
       localStorage.setItem('auth0_last_session_check', checkTime.toString());
 
+      // DISABLED: Aggressive session validation
+      // SignalR handles logout events, so this validation causes false positives
+      // Only check logout timestamp (lightweight check)
+      // Full session validation disabled to prevent reload loops
+      
+      // Only check logout timestamp - no API calls
+      checkLogoutTimestamp();
+      
+      /* DISABLED: Full session validation - causes reload issues
       try {
-        // Method 1: Get fresh access token (forces Auth0 to verify session)
         const token = await getAccessTokenSilently({
-          cacheMode: 'off', // Force fresh token check - bypasses ALL cache
-          timeoutInSeconds: 2, // Shorter timeout for faster detection
+          cacheMode: 'off',
+          timeoutInSeconds: 5,
           authorizationParams: {
-            prompt: 'none' // Silent check - no UI
+            prompt: 'none'
           }
         });
 
-        // Method 2: Verify token by calling Auth0 userinfo endpoint
-        // This ensures Auth0 session is actually valid
-        // If federated logout cleared the session, this will fail
-        try {
-          const userInfoResponse = await fetch(`https://dev-4v4hx3vrjxrwitlc.us.auth0.com/userinfo`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            cache: 'no-store' // No cache
-          });
-
-          if (!userInfoResponse.ok) {
-            // Userinfo call failed - session is invalid
-            console.log("Userinfo call failed - Auth0 session invalid", userInfoResponse.status);
-            performLogout();
-            return;
-          }
-
-          // Session is valid - userinfo returned successfully
-        } catch (userInfoError: any) {
-          // Userinfo call failed - session is invalid
-          console.log("Userinfo call failed - Auth0 session invalid", userInfoError);
-          performLogout();
-          return;
-        }
+        // Only proceed with validation if token obtained successfully
+        // Skip userinfo check to avoid CORS/network issues causing false positives
+        console.log("Session validation: Token obtained successfully");
         
       } catch (error: any) {
-        // Token refresh failed - session is invalid
-        console.log("Session validation failed - Auth0 session invalid", error);
-        
-        // Check for specific errors that indicate session is cleared
+        // Only logout on specific errors, not all errors
         if (error?.error === 'login_required' || 
             error?.error === 'invalid_grant' ||
-            error?.error === 'unauthorized' ||
-            error?.message?.includes('login_required') ||
-            error?.message?.includes('invalid_grant') ||
-            error?.message?.includes('unauthorized')) {
-          console.log("Session cleared by logout - performing logout");
+            error?.error === 'consent_required') {
+          console.log("Session cleared - performing logout", error);
           performLogout();
           return;
         }
         
-        // For other errors, check logout timestamp one more time
-        if (checkLogoutTimestamp()) {
-          return;
-        }
+        // For network/timeout errors, don't logout - just log
+        console.log("Session validation error (non-critical):", error?.error || error?.message);
       }
+      */
     };
 
     // Check when page becomes visible (user switches back to this tab)
@@ -185,18 +162,22 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // Initial check immediately and then every 2 seconds
-    // Immediate check ensures fast detection when tab becomes active
-    validateSession();
-    const initialTimer = setTimeout(validateSession, 500);
+    // DISABLED: Immediate session validation
+    // SignalR handles logout events, so immediate validation not needed
+    // Only check on visibility/focus changes
+    // validateSession(); // Disabled
+    // const initialTimer = setTimeout(validateSession, 500); // Disabled
     
-    // Periodic check every 2 seconds (AGGRESSIVE - for faster logout detection)
-    // This ensures logout is detected within 2-4 seconds
+    // DISABLED: Periodic session validation
+    // SignalR handles logout events in real-time, so aggressive polling not needed
+    // Uncomment below if you want fallback validation (not recommended with SignalR)
+    /*
     const interval = setInterval(() => {
       if (!checkLogoutTimestamp()) {
         validateSession();
       }
-    }, 2000);
+    }, 30000); // 30 seconds - much less aggressive
+    */
 
     // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -204,8 +185,8 @@ const AppContent: React.FC = () => {
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      clearTimeout(initialTimer);
-      clearInterval(interval);
+      // clearTimeout(initialTimer); // Disabled
+      // clearInterval(interval); // Disabled
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('storage', handleStorageChange);
