@@ -6,12 +6,16 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import Navbar from './components/Navbar';
 import { Loader2 } from 'lucide-react';
+import { useLogoutSignalR } from './hooks/useLogoutSignalR';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading, loginWithRedirect, getAccessTokenSilently } = useAuth0();
   const [isCheckingSso, setIsCheckingSso] = useState(true);
   const location = useLocation();
   const isCallbackRoute = location.pathname === '/callback';
+
+  // Initialize SignalR logout listener for global logout
+  useLogoutSignalR();
 
   // Session validation - checks if Auth0 session is still valid
   // This ensures logout from one app is detected by other app
