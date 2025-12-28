@@ -13,30 +13,50 @@ const Navbar: React.FC = () => {
     const clientId = "zYRUiCf30KOiUnBCELNgek3J4lm11pLR";
     const returnTo = window.location.origin;
     
-    // Clear Auth0 cache from localStorage (same key used by Auth0 React SDK)
-    // This clears the local session immediately
+    // Set logout timestamp FIRST - other tabs/apps will check this
+    const logoutTime = Date.now().toString();
+    localStorage.setItem('auth0_logout_timestamp', logoutTime);
+    
+    // Clear ALL Auth0 cache from localStorage (aggressive cleanup)
+    const keysToRemove: string[] = [];
     Object.keys(localStorage).forEach(key => {
-      if (key.includes('auth0') || key.includes('@@auth0spajs@@')) {
-        localStorage.removeItem(key);
+      if (key.includes('auth0') || 
+          key.includes('@@auth0spajs@@') || 
+          key.toLowerCase().includes('auth') ||
+          key.includes(clientId) ||
+          key.includes(auth0Domain.replace(/\./g, '_'))) {
+        keysToRemove.push(key);
       }
     });
+    keysToRemove.forEach(key => localStorage.removeItem(key));
     
-    // Clear session storage flags
+    // Clear ALL session storage flags and data
+    const sessionKeysToRemove: string[] = [];
     Object.keys(sessionStorage).forEach(key => {
-      if (key.startsWith('ss_check_')) {
-        sessionStorage.removeItem(key);
+      if (key.startsWith('ss_check_') || 
+          key.toLowerCase().includes('auth') ||
+          key.includes(clientId)) {
+        sessionKeysToRemove.push(key);
       }
     });
+    sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
     
-    // Use Auth0's logout endpoint with federated logout
+    // Clear Auth0 SDK's logout method (local logout)
+    logout({
+      logoutParams: {
+        returnTo: returnTo,
+      },
+      localOnly: true // Clear local cache immediately
+    });
+    
+    // Immediately redirect to Auth0 logout endpoint for federated logout
     // This clears the Auth0 session centrally, which will logout from all apps
     const logoutUrl = `https://${auth0Domain}/v2/logout?` +
       `client_id=${clientId}&` +
       `returnTo=${encodeURIComponent(returnTo)}&` +
       `federated`; // Enables federated logout (clears Auth0 session)
     
-    // Redirect to Auth0 logout endpoint
-    // This will clear the Auth0 session and redirect back
+    // Redirect immediately to logout endpoint
     window.location.href = logoutUrl;
   };
 
